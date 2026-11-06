@@ -1,0 +1,35 @@
+# 資安值班室｜ISO 27001 入門
+
+給零資安背景同仁的繁體中文互動教材。從虛構的市民健康講座名冊外露開始，練習辨識風險、決定措施、事件交接與查找稽核證據，最後用委外問卷案例檢查能否把判斷方法用在新情境。
+
+## 使用方式
+
+需安裝 Python 3。從專案根目錄啟動靜態伺服器，再開啟 <http://localhost:4173>。
+
+```sh
+python3 -m http.server 4173
+```
+
+程式使用原生 HTML、CSS 和 JavaScript modules，無需安裝前端套件。需透過 HTTP 開啟頁面。可交給靜態網站服務部署，入口為根目錄的 `index.html`，資源採相對路徑。
+
+## 教材與進度
+
+- 七個順序解鎖的關卡，已完成關卡可重讀解析。
+- 兩種身分的權限沙盒、風險排序、措施與適用性聲明練習、通報交接及模擬稽核。
+- 進度、尚未完成的操作和提示使用狀況存在目前瀏覽器的 `localStorage`。案件摘要可下載為 UTF-8 文字檔。
+- 所有素材都是虛構的教學情境。練習紀錄不代表組織已實施控制或取得驗證。
+- 教材定義在 `src/lessons.js`，進度規則在 `src/progress.js`，介面在 `src/app.js`。
+
+## 開發檢查
+
+用 Node.js 執行進度、沙盒判斷與匯出測試。
+
+```sh
+npm test
+```
+
+## 參考資料
+
+- [Zero to Deploy](https://github.com/tylin23/zero-to-deploy) 的互動闖關與本機進度設計。
+- [ISO/IEC 27001:2022](https://www.iso.org/standard/27001) 與 [Amd 1:2024](https://www.iso.org/standard/88435.html)。
+- [ISO/IEC 27002:2022](https://www.iso.org/standard/75652.html) 的控制措施指引。
