@@ -1,7 +1,9 @@
 import { levels, standardSources, terms } from "./lessons.js";
+import { annexThemes, chapters, clauses, controlMap } from "./standard.js";
 import {
-  buildSummary, isSolved, levelPassed, newEntry, nextLevel, permissions, readProgress,
-  recordValue, roles, setLabSetting, settings, storageKey,
+  buildSummary, chapterLevels, chapterOpen, isSolved, legacyStorageKey, levelClauses, levelLabel,
+  levelOpen, levelPassed, levelsForClause, migrateLegacy, newEntry, nextLevel,
+  passedClauses, permissions, readProgress, recordValue, roles, setLabSetting, settings, storageKey,
 } from "./progress.js";
 
 const main = document.querySelector("#main");
@@ -11,12 +13,19 @@ const levelPath = (level) => `#/level/${level.id}`;
 const hasRecords = () => levels.some((level) =>
   level.steps.some((step, index) => isSolved(step, progress[level.id]?.[index])),
 );
+const chapterOf = (id) => chapters.find((chapter) => chapter.id === id);
 let progress = {};
 let canSave = true;
 let lessonStep = 0;
 
+// v2 還沒有資料時，沿用 v1 的進度並搬到新的關卡 id。
+function loadStored() {
+  const raw = localStorage.getItem(storageKey);
+  return raw === null ? migrateLegacy(localStorage.getItem(legacyStorageKey)) : readProgress(raw);
+}
+
 try {
-  progress = readProgress(localStorage.getItem(storageKey));
+  progress = loadStored();
 } catch {
   canSave = false;
 }
@@ -24,7 +33,7 @@ try {
 function refreshProgress() {
   if (!canSave) return;
   try {
-    progress = readProgress(localStorage.getItem(storageKey));
+    progress = loadStored();
   } catch {
     canSave = false;
   }
@@ -87,13 +96,13 @@ function home() {
     </div>
   </section>
   <section class="route-preview">
-    <div class="section-title"><div><p class="eyebrow">學習路線</p><h2>從發現問題，到交得出證據。</h2></div>
+    <div class="section-title"><div><p class="eyebrow">學習路線</p><h2>跟著條文，從發現問題走到交得出證據。</h2></div>
       <a class="text-link" href="#/map">查看全部 ${levels.length} 關 →</a>
     </div>
     <div class="preview-grid">
       <article><span class="mini-mark">01</span><h3>先看見問題</h3><p>切換身分，親手測試誰可以看名冊。</p></article>
-      <article><span class="mini-mark">02</span><h3>做一個判斷</h3><p>決定優先風險，挑一個可驗證的處理方式。</p></article>
-      <article><span class="mini-mark">03</span><h3>把事情交接出去</h3><p>整理處置、證據與下一步，讓同仁接得下去。</p></article>
+      <article><span class="mini-mark">02</span><h3>逐條走過標準</h3><p>第 4 到 10 章的 25 條要求，一條一關，並附上白話說明。</p></article>
+      <article><span class="mini-mark">03</span><h3>挑對控制措施</h3><p>附錄 A 四個主題，加上 93 項控制總表隨時查。</p></article>
     </div>
   </section>`;
 }
@@ -101,20 +110,73 @@ function home() {
 function mapPage() {
   const next = nextLevel(progress);
   const done = levels.filter((level) => levelPassed(level, progress)).length;
-  return `${overview("LEARNING MAP / 學習路線", "闖關地圖", "從名冊外露一路練到風險處理、事件交接與模擬稽核。已完成的關卡可以回頭複習。")}
+  const covered = passedClauses(progress).length;
+  return `${overview("LEARNING MAP / 學習路線", "闖關地圖", "跟著 ISO/IEC 27001:2022 的條文逐條闖關。章與章依序解鎖，同一章內可以自由選關，已完成的關卡可回頭複習。")}
   <section class="map-meter panel" aria-label="闖關進度">
-    <strong>已完成 ${done} / ${levels.length} 關</strong>
+    <strong>已完成 ${done} / ${levels.length} 關 · 條文 ${covered} / ${clauses.length}</strong>
     <progress value="${done}" max="${levels.length}" aria-label="已完成關卡"></progress>
   </section>
-  <ol class="level-list">${levels.map((level, index) => {
-    const passed = levelPassed(level, progress);
-    const current = level === next;
-    const status = passed ? (assisted(level) ? "已完成 · 建議複習" : "已完成") : current ? (progress[level.id]?.some(Boolean) ? "進行中" : "可開始") : "待解鎖";
-    const detail = `<span class="level-index">${number(index)}</span><span class="level-info"><small>${level.group}</small><strong>${level.title}</strong></span><span class="status ${current ? "active" : ""}">${status}</span>`;
-    return `<li>${passed || current
-      ? `<a class="level-row" href="${levelPath(level)}" ${current ? 'aria-current="step"' : ""}>${detail}</a>`
-      : `<div class="level-row locked">${detail}</div>`}</li>`;
-  }).join("")}</ol>`;
+  ${chapters.map((chapter) => {
+    const list = chapterLevels(chapter.id);
+    if (!list.length) return "";
+    const open = chapterOpen(chapter.id, progress);
+    const finished = list.filter((level) => levelPassed(level, progress)).length;
+    return `<section class="chapter" aria-labelledby="ch-${chapter.id}">
+      <div class="chapter-head"><div><p class="eyebrow">${chapter.label}</p><h2 id="ch-${chapter.id}">${chapter.title}</h2><p class="chapter-blurb">${chapter.blurb}</p></div>
+        <span class="status ${open && finished < list.length ? "active" : ""}">${open ? `${finished} / ${list.length}` : "待解鎖"}</span></div>
+      <ol class="level-list">${list.map((level) => {
+        const index = levels.indexOf(level);
+        const passed = levelPassed(level, progress);
+        const current = level === next;
+        const status = passed ? (assisted(level) ? "已完成 · 建議複習" : "已完成") : !open ? "待解鎖" : progress[level.id]?.some(Boolean) ? "進行中" : "可開始";
+        const tag = level.clauses?.length ? `條文 ${level.clauses.join("、")}` : level.controls?.length ? "附錄 A" : chapter.label;
+        const detail = `<span class="level-index">${number(index)}</span><span class="level-info"><small>${tag}</small><strong>${level.title}</strong></span><span class="status ${current ? "active" : ""}">${status}</span>`;
+        return `<li>${open
+          ? `<a class="level-row" href="${levelPath(level)}" ${current ? 'aria-current="step"' : ""}>${detail}</a>`
+          : `<div class="level-row locked">${detail}</div>`}</li>`;
+      }).join("")}</ol>
+    </section>`;
+  }).join("")}`;
+}
+
+function coveragePage() {
+  const passed = new Set(passedClauses(progress));
+  const review = levels.filter((level) => levelPassed(level, progress) && assisted(level));
+  return `${overview("COVERAGE / 條文覆蓋", "條文覆蓋總表", "ISO/IEC 27001:2022 第 4 到 10 章共 25 條要求，每一條都有對應的關卡。這裡只放白話說明，標準原文請見官方來源。")}
+    <section class="map-meter panel">
+      <strong>已通過 ${passed.size} / ${clauses.length} 條</strong>
+      <progress value="${passed.size}" max="${clauses.length}" aria-label="已通過條文"></progress>
+    </section>
+    ${review.length ? `<p class="callout">建議複習：${review.map((level) => `<a class="text-link" href="${levelPath(level)}">${level.title}</a>`).join("、")}</p>` : ""}
+    ${chapters.filter((chapter) => clauses.some((clause) => clause[1] === chapter.id)).map((chapter) => `
+      <section class="panel clause-chapter"><h2>${chapter.label}｜${chapter.title}</h2>
+      <table class="clause-table"><thead><tr><th scope="col">條文</th><th scope="col">白話說明</th><th scope="col">關卡</th></tr></thead><tbody>
+      ${clauses.filter((clause) => clause[1] === chapter.id).map(([id, , title, plain, amd]) => {
+        const found = levelsForClause(id);
+        return `<tr><th scope="row">${id}${amd ? ' <span class="amd" title="Amd 1:2024 有異動">Amd 1</span>' : ""}</th>
+          <td><strong>${title}</strong><br><span>${plain}</span></td>
+          <td>${found.map((level) => levelOpen(level, progress)
+            ? `<a class="text-link" href="${levelPath(level)}">${level.title}</a>` : level.title).join("、")}<br>
+            <span class="status ${passed.has(id) ? "active" : ""}">${passed.has(id) ? "已通過" : "未通過"}</span></td></tr>`;
+      }).join("")}
+      </tbody></table></section>`).join("")}
+    <p class="callout">標準第 1 到 3 章（範圍、引用標準、用語）不是要求事項，相關名詞放在 <a class="text-link" href="#/terms">名詞卡</a>。附錄 A 請見 <a class="text-link" href="#/annex">附錄 A 總表</a>。</p>`;
+}
+
+function annexPage() {
+  return `${overview("ANNEX A / 控制措施", "附錄 A 控制總表", "附錄 A 共 93 項控制，分四個主題。每個主題有一關情境練習；標示「有關卡」的是情境中練到的控制，其餘供查閱。")}
+    ${annexThemes.map((theme) => {
+      const level = levels.find((item) => item.theme === theme.id);
+      const open = level && levelOpen(level, progress);
+      const done = level && levelPassed(level, progress);
+      return `<section class="panel clause-chapter"><div class="record-title"><h2>${theme.title} · ${theme.range}（${theme.controls.length} 項）</h2>
+        ${level ? (open ? `<a class="text-link" href="${levelPath(level)}">${done ? "複習" : "前往"}關卡</a>` : '<span class="status">待解鎖</span>') : ""}</div>
+        <table class="clause-table"><thead><tr><th scope="col">編號</th><th scope="col">控制</th><th scope="col">練習</th></tr></thead><tbody>
+        ${theme.controls.map(([id, name, plain]) => `<tr><th scope="row">${id}</th><td><strong>${name}</strong><br><span>${plain}</span></td>
+          <td>${level?.controls.includes(id) ? `<span class="status ${done ? "active" : ""}">${done ? "已練習" : "有關卡"}</span>` : '<span class="muted">供查閱</span>'}</td></tr>`).join("")}
+        </tbody></table></section>`;
+    }).join("")}
+    <p class="callout">說明為原創白話摘要，實作細節請參考 ISO/IEC 27002:2022。</p>`;
 }
 
 function filePage() {
@@ -202,11 +264,8 @@ function lessonPage(level) {
   const isLab = step.type === "lab";
   const chosen = isLab ? null : step.options[entry.choice];
   const feedback = isLab ? labFeedback(entry, solved) : chosen && [solved ? "ok" : "retry", chosen[2]];
-  const references = {
-    treatment: [["risk", 0]],
-    audit: [["access", 0], ["treatment", 0]],
-  };
-  const records = (references[level.id] ?? []).map(([id, stepIndex]) => priorRecord(id, stepIndex)).filter(Boolean);
+  const records = (level.needs ?? []).map(([id, stepIndex]) => priorRecord(id, stepIndex)).filter(Boolean);
+  const chapter = chapterOf(level.chapter);
   const lastStep = lessonStep === level.steps.length - 1;
   const next = levels[index + 1];
   const optionList = isLab ? labControls(entry, solved) :
@@ -214,15 +273,16 @@ function lessonPage(level) {
       `<button class="option ${entry.choice === option ? (solved ? "correct" : "incorrect") : ""}" type="button" data-option="${option}" aria-pressed="${entry.choice === option}" ${solved ? "disabled" : ""}><span class="option-letter" aria-hidden="true">${String.fromCharCode(65 + option)}</span><span>${text}</span></button>`,
     ).join("")}</div>`;
   return `<div class="breadcrumbs"><a href="#/map">闖關地圖</a><span aria-hidden="true">/</span><span>第 ${index + 1} 關</span></div>
-    ${overview(`${number(index)} / ${level.group}`, level.title, level.intro)}
+    ${overview(`${number(index)} / ${chapter.label} · ${chapter.title}`, level.title, level.intro)}
     <section class="lesson panel" aria-labelledby="step-title">
       <div class="lesson-meta"><span class="status">步驟 ${lessonStep + 1} / ${level.steps.length}</span><progress value="${lessonStep + (solved ? 1 : 0)}" max="${level.steps.length}" aria-label="本關步驟"></progress></div>
+      <p class="clause-tags" aria-label="對應條文">${level.clauses?.length ? level.clauses.map((id) => `<span class="clause-chip">條文 ${id}</span>`).join("") : level.controls?.length ? level.controls.map((id) => `<span class="clause-chip">附錄 A ${id}</span>`).join("") : `<span class="clause-chip">${level.standard}</span>`}</p>
       <h2 id="step-title">${step.title}</h2>
       <p class="prompt">${step.prompt}</p>
       ${records.length ? `<aside class="callout" aria-label="你的前情紀錄">
         <strong>從你的案件檔案帶入</strong>
         <ul>${records.map(([label, value]) => `<li>${label}｜${value}</li>`).join("")}</ul>
-        ${level.id === "audit" ? "<p>這些是演練的驗證與計畫。請另找能證明活動後確實撤權的紀錄。</p>" : ""}
+        ${level.needsNote ? `<p>${level.needsNote}</p>` : ""}
       </aside>` : ""}
       ${step.context ? `<ol class="context-grid" aria-label="情境線索">${step.context.map(([label, description]) =>
         `<li><strong>${label}</strong><span>${description}</span></li>`,
@@ -238,7 +298,20 @@ function lessonPage(level) {
           : '<button type="button" class="button primary" id="next-step">繼續下一步 →</button>') : ""}
       </div>
     </section>
-    <details class="standard-note"><summary>這一步對應哪個要求？</summary><p>${level.standard} · <a href="#/terms">查看名詞與教材來源</a></p></details>`;
+    <details class="standard-note"><summary>這一關對應哪個要求？</summary>${standardNote(level)}<p><a href="#/coverage">條文覆蓋總表</a> · <a href="#/terms">名詞與教材來源</a></p></details>`;
+}
+
+function standardNote(level) {
+  if (level.clauses?.length) {
+    return `<ul>${levelClauses(level).map(([id, , title, plain]) => `<li><strong>${id} ${title}</strong>：${plain}</li>`).join("")}</ul>`;
+  }
+  if (level.controls?.length) {
+    return `<ul>${level.controls.map((id) => {
+      const [, name, plain] = controlMap.get(id).control;
+      return `<li><strong>${id} ${name}</strong>：${plain}</li>`;
+    }).join("")}</ul>`;
+  }
+  return `<p>${levelLabel(level)}</p>`;
 }
 
 function loadEntry(level) {
@@ -338,8 +411,7 @@ function route(focus) {
 
   if (path.startsWith("/level/")) {
     const level = levels.find(({ id }) => path === `/level/${id}`);
-    const next = nextLevel(progress);
-    if (level && (level === next || levelPassed(level, progress))) {
+    if (level && levelOpen(level, progress)) {
       const firstUnsolved = level.steps.findIndex((step, index) => !isSolved(step, progress[level.id]?.[index]));
       lessonStep = Math.max(0, firstUnsolved);
       renderLesson(level);
@@ -347,7 +419,7 @@ function route(focus) {
       main.innerHTML = `${overview("LEARNING MAP / 學習路線", "先從目前關卡繼續", "這個關卡尚未開放，或連結已失效。完成目前關卡就能往前。")}<a class="button primary" href="#/map">回闖關地圖 →</a>`;
     }
   } else {
-    const pages = { "/": home, "/map": mapPage, "/file": filePage, "/terms": termsPage };
+    const pages = { "/": home, "/map": mapPage, "/coverage": coveragePage, "/annex": annexPage, "/file": filePage, "/terms": termsPage };
     main.innerHTML = (Object.hasOwn(pages, path) ? pages[path] : home)();
     main.querySelector("#download")?.addEventListener("click", downloadSummary);
   }

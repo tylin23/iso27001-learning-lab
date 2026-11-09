@@ -1,8 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { levels } from "../src/lessons.js";
+import { annexThemes, chapters, clauses } from "../src/standard.js";
 import {
-  buildSummary, isSolved, newEntry, nextLevel, permissions, readProgress, setLabSetting,
+  buildSummary, chapterOpen, coverageGaps, isSolved, levelOpen, levelPassed, migrateLegacy, newEntry,
+  nextLevel, passedClauses, permissions, readProgress, setLabSetting,
 } from "../src/progress.js";
 
 test("both identities must be tested after the last settings change", () => {
@@ -34,7 +36,7 @@ test("unfinished selections survive reload and do not unlock the next level", ()
 
 test("a completed first level unlocks the next and includes verified records in the summary", () => {
   const saved = readProgress('{"access":[{"setting":"team","tested":{"staff":true,"guest":true}},{"choice":0}]}');
-  assert.equal(nextLevel(saved).id, "scope");
+  assert.equal(nextLevel(saved).id, "c4_1");
   const summary = buildSummary(saved);
   assert.match(summary, /已驗證外部訪客無法查看/);
   assert.match(summary, /機密性與可用性/);
@@ -72,4 +74,80 @@ test("all levels can be completed in sequence and survive serialization", () => 
   for (const level of levels) {
     for (const step of level.steps) assert.ok(summary.includes(step.record), step.record);
   }
+});
+
+const solve = (level) => level.steps.map((step) => {
+  const entry = newEntry(step);
+  if (step.type === "lab") {
+    setLabSetting(entry, "team");
+    entry.tested = { guest: true, staff: true };
+  } else {
+    entry.choice = step.options.findIndex(([, correct]) => correct);
+  }
+  return entry;
+});
+
+test("standard.js lists every main clause and all 93 Annex A controls", () => {
+  assert.equal(clauses.length, 25);
+  assert.deepEqual(annexThemes.map((theme) => theme.controls.length), [37, 8, 14, 34]);
+  const ids = annexThemes.flatMap((theme) => theme.controls.map(([id]) => id));
+  assert.equal(new Set(ids).size, 93);
+  for (const theme of annexThemes) {
+    for (const [id] of theme.controls) assert.ok(id.startsWith(`${{ org: 5, people: 6, physical: 7, tech: 8 }[theme.id]}.`), id);
+  }
+});
+
+test("every clause and Annex A theme has a level, and levels cite only real clauses and controls", () => {
+  assert.deepEqual(coverageGaps(), { clauses: [], themes: [], unknownClauses: [], unknownControls: [] });
+  const chapterIds = new Set(chapters.map((chapter) => chapter.id));
+  for (const level of levels) {
+    assert.ok(chapterIds.has(level.chapter), level.id);
+    assert.ok(level.clauses?.length || level.controls?.length || level.standard, `${level.id} has no standard reference`);
+  }
+});
+
+test("each clause level matches the chapter of the clause it cites", () => {
+  for (const level of levels.filter((item) => item.clauses)) {
+    for (const id of level.clauses) {
+      assert.equal(clauses.find((clause) => clause[0] === id)[1], level.chapter, level.id);
+    }
+  }
+});
+
+test("chapters unlock in order, but levels inside an open chapter are free to pick", () => {
+  const progress = { access: solve(levels[0]) };
+  assert.equal(chapterOpen("c4", progress), true);
+  assert.equal(chapterOpen("c5", progress), false);
+  const last = levels.find((level) => level.id === "c4_4");
+  assert.equal(levelOpen(last, progress), true);
+  assert.equal(levelPassed(last, progress), false);
+  for (const id of ["c4_1", "c4_2", "c4_3"]) progress[id] = solve(levels.find((level) => level.id === id));
+  assert.equal(chapterOpen("c5", progress), false);
+  progress.c4_4 = solve(last);
+  assert.equal(chapterOpen("c5", progress), true);
+  assert.deepEqual(passedClauses(progress), ["4.1", "4.2", "4.3", "4.4"]);
+});
+
+test("version 1 progress moves to the new level ids", () => {
+  const legacy = JSON.stringify({
+    access: solve(levels[0]),
+    scope: [{ choice: 1 }],
+    treatment: [{ choice: 1 }, { choice: 0 }],
+    unknown: [{ choice: 0 }],
+  });
+  const migrated = migrateLegacy(legacy);
+  assert.equal(migrated.c4_3[0].choice, 1);
+  assert.equal(migrated.c6_1_3[1].choice, 0);
+  assert.equal(migrated.scope, undefined);
+  assert.equal(migrated.unknown, undefined);
+  assert.deepEqual(migrateLegacy(null), {});
+  assert.deepEqual(migrateLegacy("{"), {});
+});
+
+test("the summary lists clause numbers", () => {
+  const progress = {};
+  for (const level of levels.slice(0, 2)) progress[level.id] = solve(level);
+  const summary = buildSummary(progress);
+  assert.match(summary, /條文 ?4\.1|4\.1 了解組織及其處境/);
+  assert.match(summary, /已通過條文（1 \/ 25）：4\.1/);
 });

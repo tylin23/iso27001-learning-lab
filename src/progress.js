@@ -1,6 +1,13 @@
 import { levels } from "./lessons.js";
+import { annexThemes, chapters, clauseMap, clauses, controlMap } from "./standard.js";
 
-export const storageKey = "iso27001-learning-lab.v1";
+export const storageKey = "iso27001-learning-lab.v2";
+export const legacyStorageKey = "iso27001-learning-lab.v1";
+// v1 的關卡 id 對應到 v2。步驟序號不變。
+export const legacyLevelIds = {
+  access: "access", scope: "c4_3", risk: "c6_1_2", treatment: "c6_1_3",
+  incident: "annex_org", audit: "c9_2", transfer: "transfer",
+};
 export const settings = {
   public: "拿到連結的人都能看",
   closed: "暫停所有人存取",
@@ -39,6 +46,71 @@ export function levelPassed(level, progress) {
 
 export function nextLevel(progress) {
   return levels.find((level) => !levelPassed(level, progress));
+}
+
+export const chapterLevels = (chapterId) => levels.filter((level) => level.chapter === chapterId);
+
+// 章與章之間依序解鎖，同一章內可自由選關。
+export function chapterOpen(chapterId, progress) {
+  for (const chapter of chapters) {
+    if (chapter.id === chapterId) return true;
+    if (!chapterLevels(chapter.id).every((level) => levelPassed(level, progress))) return false;
+  }
+  return false;
+}
+
+export function levelOpen(level, progress) {
+  return chapterOpen(level.chapter, progress);
+}
+
+export function levelClauses(level) {
+  return (level.clauses ?? []).map((id) => clauseMap.get(id));
+}
+
+export function levelLabel(level) {
+  if (level.clauses?.length) return level.clauses.map((id) => `${id} ${clauseMap.get(id)[2]}`).join("、");
+  if (level.controls?.length) return `附錄 A｜${annexThemes.find((theme) => theme.id === level.theme).title}`;
+  return level.standard;
+}
+
+export function levelsForClause(id) {
+  return levels.filter((level) => level.clauses?.includes(id));
+}
+
+export function levelsForControl(id) {
+  return levels.filter((level) => level.controls?.includes(id));
+}
+
+export function passedClauses(progress) {
+  return clauses.filter(([id]) => {
+    const found = levelsForClause(id);
+    return found.length > 0 && found.every((level) => levelPassed(level, progress));
+  }).map(([id]) => id);
+}
+
+export function coverageGaps() {
+  return {
+    clauses: clauses.map(([id]) => id).filter((id) => !levelsForClause(id).length),
+    themes: annexThemes.filter((theme) => !levels.some((level) => level.theme === theme.id)).map((theme) => theme.id),
+    unknownClauses: levels.flatMap((level) => level.clauses ?? []).filter((id) => !clauseMap.has(id)),
+    unknownControls: levels.flatMap((level) => level.controls ?? []).filter((id) => !controlMap.has(id)),
+  };
+}
+
+// 把 v1 的進度搬到 v2 的關卡 id。無法辨識的內容會被略過。
+export function migrateLegacy(raw) {
+  let saved;
+  try {
+    saved = JSON.parse(raw);
+  } catch {
+    return {};
+  }
+  if (!saved || typeof saved !== "object") return {};
+  const mapped = {};
+  for (const [oldId, newId] of Object.entries(legacyLevelIds)) {
+    if (Array.isArray(saved[oldId])) mapped[newId] = saved[oldId];
+  }
+  return readProgress(JSON.stringify(mapped));
 }
 
 export function readProgress(raw) {
@@ -83,12 +155,16 @@ export function buildSummary(progress) {
   for (const level of levels) {
     const entries = progress[level.id];
     if (!level.steps.some((step, index) => isSolved(step, entries?.[index]))) continue;
-    lines.push(level.title);
+    lines.push(`${level.title}（${levelLabel(level)}）`);
     level.steps.forEach((step, index) => {
       const entry = entries?.[index];
       if (isSolved(step, entry)) lines.push(`• ${step.record}｜${recordValue(step, entry)}`);
     });
     lines.push("");
+  }
+  const passed = passedClauses(progress);
+  if (passed.length) {
+    lines.push(`已通過條文（${passed.length} / ${clauses.length}）：${passed.join("、")}`, "");
   }
   return lines.join("\n");
 }
