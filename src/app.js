@@ -1,4 +1,5 @@
 import { levels, standardSources, terms } from "./lessons.js";
+import { comparisons } from "./compare.js";
 import { annexThemes, chapters, clauses, controlMap } from "./standard.js";
 import {
   buildSummary, chapterLevels, chapterOpen, isSolved, legacyStorageKey, levelClauses, levelLabel,
@@ -298,7 +299,21 @@ function lessonPage(level) {
           : '<button type="button" class="button primary" id="next-step">繼續下一步 →</button>') : ""}
       </div>
     </section>
+    ${comparePanel(level)}
     <details class="standard-note"><summary>這一關對應哪個要求？</summary>${standardNote(level)}<p><a href="#/coverage">條文覆蓋總表</a> · <a href="#/terms">名詞與教材來源</a></p></details>`;
+}
+
+function comparePanel(level) {
+  const rows = comparisons[level.id];
+  if (!rows) return "";
+  const passed = levelPassed(level, progress);
+  return `<section class="panel compare" aria-labelledby="compare-title">
+    <h2 id="compare-title">條文對照</h2>
+    <p class="compare-note">${passed ? "把這一關的做法，逐項對回條文的要求。" : "先看這一關要練的條文重點；完成後會顯示每一項在情境裡怎麼對應。"}</p>
+    <div class="table-wrap"><table class="clause-table"><thead><tr><th scope="col">條文</th><th scope="col">要求重點</th><th scope="col">本關對應</th></tr></thead><tbody>
+    ${rows.map(([ref, point, how]) => `<tr><th scope="row">${ref}</th><td>${point}</td><td>${passed ? how : '<span class="muted">完成本關後顯示</span>'}</td></tr>`).join("")}
+    </tbody></table></div>
+  </section>`;
 }
 
 function standardNote(level) {

@@ -266,3 +266,7 @@ a.level-row:hover { border-color: var(--green); }
   nav a { font-size: 13px; padding-inline: 2px; }
   .chapter-head { align-items: start; }
 }
+.compare { margin-top: 15px; }
+.compare-note { color: var(--muted); font-size: 14px; }
+.table-wrap { overflow-x: auto; }
+.compare .clause-table tbody th { white-space: normal; }

@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { levels } from "../src/lessons.js";
+import { comparisons } from "../src/compare.js";
 import { annexThemes, chapters, clauses } from "../src/standard.js";
 import {
   buildSummary, chapterOpen, coverageGaps, isSolved, levelOpen, levelPassed, migrateLegacy, newEntry,
@@ -150,4 +151,15 @@ test("the summary lists clause numbers", () => {
   const summary = buildSummary(progress);
   assert.match(summary, /條文 ?4\.1|4\.1 了解組織及其處境/);
   assert.match(summary, /已通過條文（1 \/ 25）：4\.1/);
+});
+
+test("every clause and control a level cites has a row in its clause comparison", () => {
+  for (const level of levels.filter((item) => item.clauses || item.controls)) {
+    const refs = (comparisons[level.id] ?? []).map(([ref]) => ref);
+    assert.ok(refs.length, `${level.id} has no comparison`);
+    for (const id of [...(level.clauses ?? []), ...(level.controls ?? [])]) {
+      assert.ok(refs.includes(id), `${level.id} is missing ${id}`);
+    }
+  }
+  for (const id of Object.keys(comparisons)) assert.ok(levels.some((level) => level.id === id), id);
 });
