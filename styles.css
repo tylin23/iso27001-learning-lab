@@ -245,3 +245,22 @@ a.level-row:hover { border-color: var(--green); }
 .sr-only {
   position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap;
 }
+
+.audit-home { margin-bottom: 14px; }
+.audit-panel { max-width: 880px; padding: clamp(18px, 4vw, 28px); margin-bottom: 15px; }
+.audit-panel h2 { margin-bottom: 6px; }
+.audit-panel > p:not(.callout) { color: var(--muted); }
+.clause-note { max-width: 880px; }
+.clause-note > a { display: inline-block; margin-top: 10px; }
+.clause-item { border-top: 1px solid var(--line); margin-top: 12px; padding-top: 10px; }
+.clause-item > summary { cursor: pointer; color: var(--green); font-weight: 750; }
+.clause-fields { display: grid; gap: 5px; margin: 7px 0 10px; font-size: 14px; }
+.clause-fields dt { font-weight: 750; }
+.clause-fields dd { margin: 0; color: var(--muted); }
+.audit-drill { margin: 8px 0 0; }
+.audit-drill fieldset { border: 0; padding: 0; margin: 0 0 8px; min-inline-size: 0; }
+.audit-drill legend { padding: 0; margin-bottom: 6px; }
+.audit-drill label { display: block; padding: 6px 0; cursor: pointer; }
+.audit-drill input { accent-color: var(--green); }
+.audit-search { display: block; margin-top: 12px; font-weight: 750; }
+#clause-search { font: inherit; width: min(100%, 440px); padding: 8px 10px; border: 1px solid #91a89a; border-radius: 7px; background: var(--surface); color: var(--ink); }

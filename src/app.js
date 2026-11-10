@@ -1,3 +1,4 @@
+import { auditPage, lessonClausePanel, wireAuditPage } from "./audit-view.js";
 import { levels, standardSources, terms } from "./lessons.js";
 import {
   buildSummary, isSolved, levelPassed, newEntry, nextLevel, permissions, readProgress,
@@ -90,6 +91,7 @@ function home() {
     <div class="section-title"><div><p class="eyebrow">學習路線</p><h2>從發現問題，到交得出證據。</h2></div>
       <a class="text-link" href="#/map">查看全部 ${levels.length} 關 →</a>
     </div>
+    <p class="audit-home"><a class="text-link" href="#/audit">準備考稽核員？開始條文與證據練習 →</a></p>
     <div class="preview-grid">
       <article><span class="mini-mark">01</span><h3>先看見問題</h3><p>切換身分，親手測試誰可以看名冊。</p></article>
       <article><span class="mini-mark">02</span><h3>做一個判斷</h3><p>決定優先風險，挑一個可驗證的處理方式。</p></article>
@@ -238,7 +240,7 @@ function lessonPage(level) {
           : '<button type="button" class="button primary" id="next-step">繼續下一步 →</button>') : ""}
       </div>
     </section>
-    <details class="standard-note"><summary>這一步對應哪個要求？</summary><p>${level.standard} · <a href="#/terms">查看名詞與教材來源</a></p></details>`;
+    ${lessonClausePanel(level, lessonStep)}`;
 }
 
 function loadEntry(level) {
@@ -347,8 +349,9 @@ function route(focus) {
       main.innerHTML = `${overview("LEARNING MAP / 學習路線", "先從目前關卡繼續", "這個關卡尚未開放，或連結已失效。完成目前關卡就能往前。")}<a class="button primary" href="#/map">回闖關地圖 →</a>`;
     }
   } else {
-    const pages = { "/": home, "/map": mapPage, "/file": filePage, "/terms": termsPage };
+    const pages = { "/": home, "/map": mapPage, "/file": filePage, "/terms": termsPage, "/audit": auditPage };
     main.innerHTML = (Object.hasOwn(pages, path) ? pages[path] : home)();
+    if (path === "/audit") wireAuditPage(main);
     main.querySelector("#download")?.addEventListener("click", downloadSummary);
   }
   renderStorageNotice();
