@@ -1,3 +1,4 @@
+import { enterprisePage, wireEnterprisePage } from "./enterprise-view.js";
 import { auditPage, lessonClausePanel, wireAuditPage } from "./audit-view.js";
 import { levels, standardSources, terms } from "./lessons.js";
 import {
@@ -332,7 +333,7 @@ function downloadSummary() {
 
 function route(focus) {
   const path = location.hash.slice(1) || "/";
-  const section = path.startsWith("/level/") ? "/map" : path;
+  const section = path.startsWith("/level/") ? "/map" : path === "/enterprise" ? "/audit" : path;
   for (const link of document.querySelectorAll("nav a")) {
     if (link.hash === `#${section}`) link.setAttribute("aria-current", "page");
     else link.removeAttribute("aria-current");
@@ -349,9 +350,10 @@ function route(focus) {
       main.innerHTML = `${overview("LEARNING MAP / 學習路線", "先從目前關卡繼續", "這個關卡尚未開放，或連結已失效。完成目前關卡就能往前。")}<a class="button primary" href="#/map">回闖關地圖 →</a>`;
     }
   } else {
-    const pages = { "/": home, "/map": mapPage, "/file": filePage, "/terms": termsPage, "/audit": auditPage };
+    const pages = { "/": home, "/map": mapPage, "/file": filePage, "/terms": termsPage, "/audit": auditPage, "/enterprise": enterprisePage };
     main.innerHTML = (Object.hasOwn(pages, path) ? pages[path] : home)();
     if (path === "/audit") wireAuditPage(main);
+    if (path === "/enterprise") wireEnterprisePage(main);
     main.querySelector("#download")?.addEventListener("click", downloadSummary);
   }
   renderStorageNotice();

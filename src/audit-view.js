@@ -26,6 +26,7 @@ export function auditPage() {
     <p class="eyebrow">AUDIT PRACTICE / 條文與證據</p>
     <h1>稽核員備考</h1>
     <p>先從情境找準則，再挑客觀證據，最後寫出可查證的發現。可先用原版標準查找，再回來對照解析。</p>
+    <p class="audit-home"><a class="button primary" href="#/enterprise">開始企業案例 · 雲診通 →</a></p>
   </header>
   <section class="panel audit-panel" aria-labelledby="audit-method-title">
     <h2 id="audit-method-title">稽核判斷的三個步驟</h2>

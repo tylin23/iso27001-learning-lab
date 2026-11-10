@@ -264,3 +264,8 @@ a.level-row:hover { border-color: var(--green); }
 .audit-drill input { accent-color: var(--green); }
 .audit-search { display: block; margin-top: 12px; font-weight: 750; }
 #clause-search { font: inherit; width: min(100%, 440px); padding: 8px 10px; border: 1px solid #91a89a; border-radius: 7px; background: var(--surface); color: var(--ink); }
+
+.case-filters { display: grid; grid-template-columns: repeat(auto-fit, minmax(185px, 1fr)); gap: 10px; margin: 12px 0 8px; }
+.case-filters label { display: grid; gap: 3px; font-size: 14px; font-weight: 750; }
+.case-filters :is(input, select) { min-width: 0; width: 100%; min-height: 42px; padding: 7px 9px; font: inherit; border: 1px solid #91a89a; border-radius: 7px; color: var(--ink); background: var(--surface); }
+.case-interview { margin-top: 8px; }
